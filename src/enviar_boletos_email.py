@@ -28,6 +28,13 @@ from email.message import EmailMessage
 sys.stdout.reconfigure(encoding="utf-8")
 sys.stderr.reconfigure(encoding="utf-8")
 
+# Carrega o .env ANTES de importar o wba (que lê WBA_*/CEDENTES/DOWNLOAD_DIR no import).
+try:
+    from dotenv import load_dotenv
+    load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+except Exception:
+    pass
+
 import wba                                # noqa: E402
 import email_boleto as eb                 # noqa: E402
 from playwright.sync_api import sync_playwright   # noqa: E402

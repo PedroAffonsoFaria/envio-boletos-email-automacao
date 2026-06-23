@@ -114,7 +114,10 @@ def carregar_planilha():
 
 def pagador_do_boleto(pdf_path):
     """Lê o boleto e devolve (documento_digitos, nome) do PAGADOR (sacado).
-    Robusto a layouts: procura 'Pagador'/'Sacado' e o 1º CNPJ/CPF próximo."""
+    Layout WBA/Bradesco: 'Pagador <NOME> - CNPJ 99.999.999/9999-99' (mesma linha).
+    Evita 'Recibo do Pagador' (cabeçalho), 'Beneficiário' (cedente) e
+    'Sacador/Avalista' (cedente). Se não identificar com segurança, devolve None
+    (vira pendência — melhor que chutar o sacado errado)."""
     import pdfplumber
     try:
         with pdfplumber.open(pdf_path) as pdf:
@@ -122,21 +125,15 @@ def pagador_do_boleto(pdf_path):
     except Exception:
         return None, None
 
-    doc = nome = None
-    m = re.search(r"(?:Pagador|Sacado)(?:\s*\(a\))?\s*[:\n]\s*(.+(?:\n.+){0,2})",
-                  full, flags=re.IGNORECASE)
+    # 1) "Pagador <nome> - CNPJ/CPF <doc>" na mesma linha (formato do WBA)
+    m = re.search(r"\bPagador[ \t]+(.+?)\s*-\s*(?:CNPJ|CPF)\s*(" + CNPJ_CPF + r")", full)
     if m:
-        bloco = m.group(1)
-        nome = re.split(r"[|\n]", bloco)[0].strip()
-        dm = re.search(CNPJ_CPF, bloco)
-        if dm:
-            doc = _so_digitos(dm.group(0))
-    if not doc:
-        m2 = re.search(r"(?:Pagador|Sacado)[\s\S]{0,160}?(" + CNPJ_CPF + r")",
-                       full, flags=re.IGNORECASE)
-        if m2:
-            doc = _so_digitos(m2.group(1))
-    return doc, (nome or None)
+        return _so_digitos(m.group(2)), m.group(1).strip()
+    # 2) "Pagador <nome> <doc>" (sem o rótulo CNPJ), ainda na mesma linha
+    m = re.search(r"\bPagador[ \t]+(.+?)\s+(" + CNPJ_CPF + r")", full)
+    if m:
+        return _so_digitos(m.group(2)), m.group(1).strip()
+    return None, None
 
 
 # ─────────────────────────────────────────────

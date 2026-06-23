@@ -1,0 +1,25 @@
+# Segredos / config local — NUNCA commitar
+.env
+.env.yaml
+*.env-vars
+
+# Downloads e artefatos de execução
+downloads/
+boletos/
+*.pdf
+debug_*.png
+resumo_email_*.json
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# SO / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

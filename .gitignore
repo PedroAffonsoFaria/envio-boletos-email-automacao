@@ -1,6 +1,6 @@
 # Segredos / config local — NUNCA commitar
 .env
-.env.yaml
+.env*.yaml
 *.env-vars
 
 # Downloads e artefatos de execução

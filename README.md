@@ -48,26 +48,47 @@ BOLETOS_EMAIL_HEADLESS=false python src/enviar_boletos_email.py "MUUH OUTSOURCIN
 Validação segura: `--dry-run` → depois `EMAIL_TESTE=seu@email` (envia tudo p/ você
 com `[TESTE]`) → por fim remova `EMAIL_TESTE` para ir ao vivo.
 
-## Deploy — Cloud Run Job + Scheduler 9h
+## Deploy — Cloud Run Job + Scheduler 9h (em produção)
+Projeto `smartpagamentos`, região `us-central1`. Imagem
+`gcr.io/smartpagamentos/boletos-email:latest` (build via `cloudbuild.yaml`).
+Config do Job vem de um `.env.yaml` (gerado do `.env`, **gitignored**).
+
 ```bash
-IMG=us-central1-docker.pkg.dev/smartpagamentos/boletos-email-automation/job:latest
-gcloud builds submit --tag "$IMG" -f docker/Dockerfile .
+# 1) Build da imagem
+gcloud builds submit --config cloudbuild.yaml --project smartpagamentos .
 
+# 2) .env.yaml (mapa YAML com as MESMAS chaves do .env, sem EMAIL_TESTE p/ produção)
+
+# 3) Criar o Job (resources p/ o Chromium headless)
 gcloud run jobs create boletos-email \
-  --image "$IMG" --region us-central1 --project smartpagamentos \
-  --max-retries 0 --task-timeout 1800 \
-  --set-env-vars "EMAIL_TESTE=pedroaffonso5@gmail.com,WBA_LOGIN=...,WBA_SENHA=...,CEDENTES=...,EMAIL_LOGIN=...,EMAIL_SENHA=...,EMAIL_FROM=...,EMAIL_SHEET_ID=..."
+  --image gcr.io/smartpagamentos/boletos-email:latest \
+  --region us-central1 --project smartpagamentos \
+  --env-vars-file .env.yaml --memory 2Gi --cpu 2 \
+  --max-retries 0 --task-timeout 1800
 
-gcloud run jobs execute boletos-email --region us-central1   # teste manual
+# 4) Deixar o SA dos schedulers executar o Job
+gcloud run jobs add-iam-policy-binding boletos-email \
+  --member="serviceAccount:bot-boletos@smartpagamentos.iam.gserviceaccount.com" \
+  --role="roles/run.invoker" --region us-central1 --project smartpagamentos
 
+# 5) Scheduler 9h seg-sex (America/Sao_Paulo) → dispara o Job
 gcloud scheduler jobs create http boletos-email-900 \
-  --location us-central1 --schedule "0 9 * * 1-5" --time-zone "America/Sao_Paulo" \
+  --location us-central1 --project smartpagamentos \
+  --schedule "0 9 * * 1-5" --time-zone "America/Sao_Paulo" \
   --uri "https://us-central1-run.googleapis.com/v2/projects/smartpagamentos/locations/us-central1/jobs/boletos-email:run" \
   --http-method POST \
-  --oauth-service-account-email bot-boletos@smartpagamentos.iam.gserviceaccount.com
+  --oauth-service-account-email "bot-boletos@smartpagamentos.iam.gserviceaccount.com"
+```
 
-# Ir ao vivo:
-gcloud run jobs update boletos-email --region us-central1 --remove-env-vars EMAIL_TESTE
+Operação:
+```bash
+# rodar manualmente quando quiser
+gcloud run jobs execute boletos-email --region us-central1 --project smartpagamentos
+# pausar / retomar o automático
+gcloud scheduler jobs pause  boletos-email-900 --location us-central1 --project smartpagamentos
+gcloud scheduler jobs resume boletos-email-900 --location us-central1 --project smartpagamentos
+# validar na nuvem sem atingir ninguém (modo teste)
+gcloud run jobs update boletos-email --update-env-vars EMAIL_TESTE=voce@email --region us-central1 --project smartpagamentos
 ```
 
 ## Configuração

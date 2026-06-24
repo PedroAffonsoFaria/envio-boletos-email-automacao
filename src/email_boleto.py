@@ -29,7 +29,7 @@ from pathlib import Path
 from datetime import date, timedelta
 from email.header import decode_header, make_header
 from email.message import EmailMessage
-from email.utils import getaddresses
+from email.utils import getaddresses, make_msgid, formatdate
 
 import requests
 
@@ -325,6 +325,10 @@ def responder_com_boleto(email_sac, anexos, thread, cc_list=None):
     if cc:
         msg["Cc"] = ", ".join(dict.fromkeys(cc))   # sem duplicar
     msg["Subject"] = prefixo + subj
+    # Date + Message-ID próprios (higiene; ajuda exibição/threading em alguns clientes)
+    msg["Date"] = formatdate(localtime=True)
+    _dom = remetente.split("@")[-1] if (remetente and "@" in remetente) else "smartdf.com.br"
+    msg["Message-ID"] = make_msgid(domain=_dom)
     mid = thread.get("message_id")
     if mid:
         msg["In-Reply-To"] = mid
